@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Build
 import android.os.Handler
@@ -58,6 +59,8 @@ class LockService : AccessibilityService() {
 
     /**
      * 前面のアプリが変わったら評価し直す。通知シェード・キーボード・SleepGuard 自身は切り替えとみなさない。
+     * ホーム画面のアプリも見ない。履歴の画面もホーム画面のアプリが出すので、見ると音声や時計のアプリを履歴から閉じられない。
+     * ホーム画面からほかのアプリを開けば、そのアプリに移ったとみなす。
      * 画面全体を覆わないウィンドウも見ない。ランチャーはアプリを開いたあとにも部品のウィンドウのイベントを出すので、
      * それを拾うと、開いたアプリが前面にあるのにランチャーに移ったとみなしてしまう。
      */
@@ -66,10 +69,16 @@ class LockService : AccessibilityService() {
         val pkg = event.packageName?.toString() ?: return
         if (pkg == state.foreground || pkg == packageName || pkg == "com.android.systemui") return
         if (getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == pkg }) return
+        if (pkg == homeApp()) return
         state.foreground = pkg
         tick()
     }
     override fun onInterrupt() {}
+
+    private fun homeApp(): String? {
+        val home = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+        return packageManager.resolveActivity(home, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+    }
 
     /** 「開始」「停止」のあと。外出中の通知の表示を合わせ直すため、Guard を作り直して評価する。 */
     private fun restart() {
