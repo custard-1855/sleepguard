@@ -124,12 +124,6 @@ class State(private val p: Store) {
         get() = p.getString("soundApp")
         set(v) = p.putString("soundApp", v)
 
-    /** 「音声を聴く」を使った夜と、ほかのアプリに移ってその分が終わった夜。 */
-    fun canUseSound(night: LocalDate) = p.getString("sound") != night.toString()
-    fun setSound(night: LocalDate) = p.putString("sound", night.toString())
-    fun soundActive(night: LocalDate) = !canUseSound(night) && p.getString("soundEnded") != night.toString()
-    fun endSound(night: LocalDate) = p.putString("soundEnded", night.toString())
-
     /** 1時以降に初めて使っていた時刻(その夜のもの)。 */
     fun lateNight() = p.getString("lateNight")
     fun lateSince() = p.getLong("lateSince")

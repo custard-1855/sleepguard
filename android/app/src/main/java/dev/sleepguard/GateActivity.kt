@@ -94,14 +94,12 @@ class GateActivity : Activity() {
         val state = State(this)
         val sound = state.soundApp.takeIf { it != "" }?.let { packageManager.getLaunchIntentForPackage(it) }
         if (sound != null) {
-            val usable = state.canUseSound(Schedule.nightOf(LocalDateTime.now()))
-            button(if (usable) "音声を聴く" else "音声を聴く(今夜は使用済み)") {
-                if (guard.soundPass(LocalDateTime.now())) {
-                    resolved = true
-                    startActivity(sound.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    finish()
-                }
-            }.isEnabled = usable
+            // 開いたアプリが前面にある間はロックしない(Guard が前面のアプリで判定する)
+            button("音声を聴く") {
+                resolved = true
+                startActivity(sound.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                finish()
+            }
         }
         armIdle()
     }

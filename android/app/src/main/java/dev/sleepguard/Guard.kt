@@ -91,12 +91,13 @@ class Guard(private val state: State, private val fx: Effects) {
         }
     }
 
-    /** ロックの対象になったとき。緊急解除中と「音声を聴く」の間は見逃し、それ以外は確認画面を出す。 */
+    /** ロックの対象になったとき。緊急解除中と、音声のアプリが前面にある間は見逃し、それ以外は確認画面を出す。 */
     private fun askOrLock(night: LocalDate, ms: Long, device: Device) {
         if (ms < state.emergencyUntil) return
-        if (state.soundActive(night)) {
-            if (device.foreground == state.soundApp) return
-            if (device.foreground != "") state.endSound(night)
+        if (state.soundApp != "" && device.foreground == state.soundApp) {
+            // 確認画面から音声のアプリに移った。確認画面を出せなかったときのロックはしない
+            if (state.askedAt != 0L) state.askedAt = 0
+            return
         }
         if (device.gateShown) return
         if (!fx.canLock) {
@@ -137,14 +138,6 @@ class Guard(private val state: State, private val fx: Effects) {
         state.addEmergency(Schedule.nightOf(now), "${now.hour}:%02d".format(now.minute))
     }
 
-    /** 確認画面の「音声を聴く」。アプリを選んであり、その夜にまだ使っていなければ使えるようにして true を返す。 */
-    fun soundPass(now: LocalDateTime): Boolean {
-        val night = Schedule.nightOf(now)
-        if (state.soundApp == "" || !state.canUseSound(night)) return false
-        state.askedAt = 0
-        state.setSound(night)
-        return true
-    }
 
     /** 「外出中」「今夜は外出」。その夜だけ外出モードにする。 */
     fun goOut(now: LocalDateTime) {

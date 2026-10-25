@@ -272,41 +272,27 @@ class GuardTest {
     }
 
     @Test
-    fun `音声のアプリは前面にあるあいだ、時間に関係なくロックしない`() {
+    fun `音声のアプリが前面にあるあいだは、時間に関係なくロックしない`() {
         tick("01:00", unlocked)
-        tick("01:10", unlocked)
-        assertEquals(true, guard.soundPass(at("01:10")))
-        assertEquals(emptyList<String>(), tick("01:11", using(AUDIO)))
+        assertEquals(emptyList<String>(), tick("01:10", using(AUDIO)))
         assertEquals(emptyList<String>(), tick("03:00", using(AUDIO)))
     }
 
     @Test
-    fun `音声のアプリからほかのアプリに移ったら、その夜はもう使えない`() {
+    fun `音声のアプリからほかのアプリに移ったら確認画面を出し、戻れば何度でも使える`() {
         tick("01:00", unlocked)
-        tick("01:10", unlocked)
-        guard.soundPass(at("01:10"))
-        tick("01:11", using(AUDIO))
+        tick("01:10", using(AUDIO))
         assertEquals(ASK, tick("01:20", using("com.android.launcher")))
-        assertEquals(false, guard.soundPass(at("01:21")))
+        assertEquals(emptyList<String>(), tick("01:21", using(AUDIO).copy(gateShown = true)))
+        assertEquals(emptyList<String>(), tick("01:30", using(AUDIO)))
+        assertEquals(ASK, tick("01:40", using("com.android.chrome")))
     }
 
     @Test
-    fun `音声を聴くは一晩に1回だけで、次の夜にはまた使える`() {
-        assertEquals(true, guard.soundPass(at("01:10")))
-        assertEquals(false, guard.soundPass(at("05:59")))
-        assertEquals(true, guard.soundPass(at("2026-10-26T01:10")))
-    }
-
-    @Test
-    fun `音声を聴くを使っていなければ、音声のアプリが前面にあってもロックの対象にする`() {
-        tick("01:00", unlocked)
-        assertEquals(ASK, tick("01:10", using(AUDIO)))
-    }
-
-    @Test
-    fun `音声のアプリを選んでいなければ、音声を聴くは使えない`() {
+    fun `音声のアプリを選んでいなければ、前面のアプリがわからなくても見逃さない`() {
         State(store).soundApp = ""
-        assertEquals(false, guard.soundPass(at("01:10")))
+        tick("01:00", unlocked)
+        assertEquals(ASK, tick("01:10", unlocked))
     }
 
     @Test
