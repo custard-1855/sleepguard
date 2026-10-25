@@ -6,7 +6,7 @@
   <string>com.sleepguard.agent</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/local/sleepguard/sleepguard.sh</string>
+    <string>/Library/Application Support/SleepGuard/sleepguard.sh</string>
   </array>
   <!-- 22時〜6時の間だけ毎分起動する(Minute を省くと、その時の毎分になる) -->
   <key>StartCalendarInterval</key>
