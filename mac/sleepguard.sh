@@ -91,6 +91,12 @@ once() { # その夜に一度だけ true
   touch "$f"
 }
 
+notify_once() { # notify_once キー 見出し 本文: その夜に一度だけ通知する
+  # 印は通知に成功したときだけ付ける。失敗したら(ログイン画面など)次の分で再試行する
+  [ -e "$STATE_DIR/once-$1" ] && return 0
+  notify "$2" "$3" && touch "$STATE_DIR/once-$1"
+}
+
 lock_screen() {
   log "lock"
   [ "$DRY_RUN" = 1 ] && return
@@ -120,10 +126,10 @@ if (( HM >= BATH_START && HM <= BATH_END )); then
   fi
 
 elif (( HM >= MIDNIGHT_START && HM <= MIDNIGHT_END )); then
-  once "midnight-$DAY" && notify "0時です" "寝る準備をしましょう。"
+  notify_once "midnight-$DAY" "0時です" "寝る準備をしましょう。"
 
 elif (( HM >= WARN_START && HM <= WARN_END )); then
-  once "warn-$DAY" && notify "まもなく1時です" "1時以降も使っていると、10分後に画面をロックします。"
+  notify_once "warn-$DAY" "まもなく1時です" "1時以降も使っていると、10分後に画面をロックします。"
 
 elif (( HM >= LATE_START && HM <= LATE_END )); then
   check_idle
