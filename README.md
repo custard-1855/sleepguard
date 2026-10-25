@@ -30,12 +30,14 @@ sudo ./install.sh      # 入れる
 sudo ./uninstall.sh    # 外す
 ```
 
-`install.sh` は次の2つを置き、launchd(root)から `sleepguard.sh` を22時〜6時の間だけ毎分実行させます。常駐するプロセスはなく、日中は起動もしません。
+`install.sh` は次の2つを root:wheel の所有で置き、launchd(root)から `sleepguard.sh` を22時〜6時の間だけ毎分実行させます。常駐するプロセスはなく、日中は起動もしません。
 
-- `/usr/local/sleepguard/sleepguard.sh`
+- `/Library/Application Support/SleepGuard/sleepguard.sh`
 - `/Library/LaunchDaemons/com.sleepguard.agent.plist`
 
-### 初回の設定
+以前の版は `/usr/local/sleepguard` に置いていました。`/usr/local` は Homebrew の環境で一般ユーザーの所有になっていることがあり、root で動くスクリプトをすり替えられる恐れがあるため移しました。`install.sh` は旧配置先が残っていれば消します。`uninstall.sh` は新旧どちらの配置先も、夜ごとの記録(`/var/db/sleepguard`)も消します。
+
+### 前提条件
 
 - 「システム設定 → ロック画面 → スクリーンセーバの開始後またはディスプレイがオフになったときにパスワードを要求」を「すぐに」にしてください。これが「すぐに」でないと、画面が消えるだけでロックされません。
 - 通知が出ないときは「システム設定 → 通知 → スクリプトエディタ」を許可してください(osascript の通知はこの名前で出ます)。
@@ -60,12 +62,21 @@ sudo ./uninstall.sh    # 外す
 ### ログと動作確認
 
 - ログ: `/var/log/sleepguard.log`
-- 時刻と無操作時間を指定して、何も実行せずログだけ出せます。
+- 一般ユーザーで実行すると、時刻と無操作時間を指定して、通知もロックもせずログだけ出せます。`SG_DRY_RUN=1` と `SG_STATE_DIR` は必須で、どちらかが欠けていると何もせず終了します。root で実行したときは `SG_*` をすべて無視して本番どおりに動くので、`sudo` は付けないでください。
 
   ```sh
-  SG_DRY_RUN=1 SG_USER=$USER SG_STATE_DIR=/tmp/sg SG_IDLE=5 \
+  SG_DRY_RUN=1 SG_USER=$USER SG_STATE_DIR=$(mktemp -d) SG_IDLE=5 \
     SG_NOW=$(date -j -f "%Y-%m-%d %H:%M" "2026-10-13 01:05" +%s) ./sleepguard.sh
   ```
+
+### テスト
+
+```sh
+cd mac
+./test.sh
+```
+
+一般ユーザーで実行します(`sudo` は付けません)。上の dry run で時刻・無操作時間・ログイン中のユーザーを変えながら `sleepguard.sh` を呼び、ログに出た通知・ダイアログ・ロックを確かめます。ケースごとに一時ディレクトリを使うので、インストール済みの状態には触れません。ケースごとに PASS/FAIL を表示し、1件でも失敗すると終了コードが0以外になります。
 
 ## Android
 
