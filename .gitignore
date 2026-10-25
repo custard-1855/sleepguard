@@ -1,0 +1,17 @@
+# macOS
+.DS_Store
+
+# Android / Gradle
+android/.gradle/
+android/.kotlin/
+android/local.properties
+android/**/build/
+android/captures/
+*.apk
+*.aab
+*.jks
+*.keystore
+
+# IDE
+.idea/
+*.iml

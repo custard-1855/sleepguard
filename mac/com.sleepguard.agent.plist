@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.sleepguard.agent</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/sleepguard/sleepguard.sh</string>
+  </array>
+  <!-- 22時〜6時の間だけ毎分起動する(Minute を省くと、その時の毎分になる) -->
+  <key>StartCalendarInterval</key>
+  <array>
+    <dict><key>Hour</key><integer>22</integer></dict>
+    <dict><key>Hour</key><integer>23</integer></dict>
+    <dict><key>Hour</key><integer>0</integer></dict>
+    <dict><key>Hour</key><integer>1</integer></dict>
+    <dict><key>Hour</key><integer>2</integer></dict>
+    <dict><key>Hour</key><integer>3</integer></dict>
+    <dict><key>Hour</key><integer>4</integer></dict>
+    <dict><key>Hour</key><integer>5</integer></dict>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>AbandonProcessGroup</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/var/log/sleepguard.log</string>
+  <key>StandardErrorPath</key>
+  <string>/var/log/sleepguard.log</string>
+</dict>
+</plist>

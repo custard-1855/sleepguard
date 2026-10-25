@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lock_desc">22時〜6時の通知と、1時以降も使っているときの画面ロックを行います。画面の内容は読み取らず、前面にあるアプリの名前だけを使います。</string>
+</resources>

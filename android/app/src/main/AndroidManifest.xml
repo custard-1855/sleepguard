@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- 「音声を聴く」で開くアプリを、アプリ画面でホーム画面のアプリの一覧から選ぶため -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
+    <application
+        android:label="SleepGuard"
+        android:icon="@drawable/ic_moon"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 確認画面。履歴に出さず、ほかのアプリの task に混ざらないようにする -->
+        <activity
+            android:name=".GateActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="" />
+
+        <service
+            android:name=".LockService"
+            android:exported="true"
+            android:label="SleepGuard"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lock_service" />
+        </service>
+
+        <receiver
+            android:name=".BathDoneReceiver"
+            android:exported="false" />
+
+        <receiver
+            android:name=".OutingReceiver"
+            android:exported="false" />
+    </application>
+</manifest>
