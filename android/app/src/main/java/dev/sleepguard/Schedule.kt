@@ -124,6 +124,15 @@ class State(private val p: Store) {
         get() = p.getString("soundApp")
         set(v) = p.putString("soundApp", v)
 
+    /**
+     * 前面にあるアプリのパッケージ名。わからなければ ""。
+     * ユーザー補助サービスが接続し直したあとも前面のアプリがわかるように保存しておく。
+     * 接続し直す前にアプリを移っていたら、次に前面のアプリが変わるまでは古いままになる。
+     */
+    var foreground: String
+        get() = p.getString("foreground")
+        set(v) = p.putString("foreground", v)
+
     /** 1時以降に初めて使っていた時刻(その夜のもの)。 */
     fun lateNight() = p.getString("lateNight")
     fun lateSince() = p.getLong("lateSince")

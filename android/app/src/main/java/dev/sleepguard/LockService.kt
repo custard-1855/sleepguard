@@ -29,9 +29,6 @@ class LockService : AccessibilityService() {
 
     private val ticker = Runnable { tick() }
 
-    /** 前面にあるアプリ。接続したばかりでまだわからなければ ""。 */
-    private var foreground = ""
-
     /** 画面点灯・ロック解除と、時刻・タイムゾーンの変更で評価し直す。 */
     private val screenReceiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) = tick()
@@ -59,13 +56,17 @@ class LockService : AccessibilityService() {
         return super.onUnbind(intent)
     }
 
-    /** 前面のアプリが変わったら評価し直す。通知シェード・キーボード・SleepGuard 自身は切り替えとみなさない。 */
+    /**
+     * 前面のアプリが変わったら評価し直す。通知シェード・キーボード・SleepGuard 自身は切り替えとみなさない。
+     * 画面全体を覆わないウィンドウも見ない。ランチャーはアプリを開いたあとにも部品のウィンドウのイベントを出すので、
+     * それを拾うと、開いたアプリが前面にあるのにランチャーに移ったとみなしてしまう。
+     */
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || !event.isFullScreen) return
         val pkg = event.packageName?.toString() ?: return
-        if (pkg == foreground || pkg == packageName || pkg == "com.android.systemui") return
+        if (pkg == state.foreground || pkg == packageName || pkg == "com.android.systemui") return
         if (getSystemService(InputMethodManager::class.java).enabledInputMethodList.any { it.packageName == pkg }) return
-        foreground = pkg
+        state.foreground = pkg
         tick()
     }
     override fun onInterrupt() {}
@@ -104,7 +105,7 @@ class LockService : AccessibilityService() {
             inCall = audioMode == AudioManager.MODE_RINGTONE ||
                 audioMode == AudioManager.MODE_IN_CALL ||
                 audioMode == AudioManager.MODE_IN_COMMUNICATION,
-            foreground = foreground,
+            foreground = state.foreground,
             gateShown = GateActivity.shown,
         )
     }
