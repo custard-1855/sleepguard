@@ -6,6 +6,7 @@ import java.time.LocalDateTime
 /**
  * tick のたびに読み直す端末の状態。
  * foreground は前面にあるアプリのパッケージ名(わからなければ "")、gateShown は確認画面を出しているかどうか。
+ * clockApp は端末の標準の時計のアプリのパッケージ名(わからなければ "")。
  */
 data class Device(
     val screenOn: Boolean,
@@ -13,6 +14,7 @@ data class Device(
     val inCall: Boolean,
     val foreground: String = "",
     val gateShown: Boolean = false,
+    val clockApp: String = "",
 )
 
 /** 時間割の評価結果として起こすこと。 */
@@ -91,11 +93,12 @@ class Guard(private val state: State, private val fx: Effects) {
         }
     }
 
-    /** ロックの対象になったとき。緊急解除中と、音声のアプリが前面にある間は見逃し、それ以外は確認画面を出す。 */
+    /** ロックの対象になったとき。緊急解除中と、音声か時計のアプリが前面にある間は見逃し、それ以外は確認画面を出す。 */
     private fun askOrLock(night: LocalDate, ms: Long, device: Device) {
         if (ms < state.emergencyUntil) return
-        if (state.soundApp != "" && device.foreground == state.soundApp) {
-            // 確認画面から音声のアプリに移った。確認画面を出せなかったときのロックはしない
+        val fg = device.foreground
+        if (fg != "" && (fg == state.soundApp || fg == device.clockApp)) {
+            // 確認画面から音声か時計のアプリに移った。確認画面を出せなかったときのロックはしない
             if (state.askedAt != 0L) state.askedAt = 0
             return
         }

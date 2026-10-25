@@ -1,11 +1,13 @@
 package dev.sleepguard
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.provider.AlarmClock
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -95,13 +97,24 @@ class GateActivity : Activity() {
         val sound = state.soundApp.takeIf { it != "" }?.let { packageManager.getLaunchIntentForPackage(it) }
         if (sound != null) {
             // 開いたアプリが前面にある間はロックしない(Guard が前面のアプリで判定する)
-            button("音声を聴く") {
-                resolved = true
-                startActivity(sound.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                finish()
-            }
+            button("音声を聴く") { open(sound) }
         }
+        // 時計のアプリが前面にある間もロックしない。アラームの一覧の intent は SET_ALARM の権限を求める機種があるので、
+        // ホーム画面から開くときと同じ intent で開く
+        val clock = clockApp(this).takeIf { it != "" }?.let { packageManager.getLaunchIntentForPackage(it) }
+        if (clock != null) button("アラームを設定") { open(clock) }
         armIdle()
+    }
+
+    /** 音声か時計のアプリを開く。開けなければロックする。ここで落ちると、ユーザー補助サービスごと止まってしまう。 */
+    private fun open(intent: Intent) {
+        try {
+            startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {
+            return lockAndFinish()
+        }
+        resolved = true
+        finish()
     }
 
     private fun showConfirm() {
@@ -163,5 +176,13 @@ class GateActivity : Activity() {
     companion object {
         /** 確認画面を出しているかどうか。LockService が tick で読む。 */
         @Volatile var shown = false
+
+        /** アラームの一覧を開く、端末の標準の時計のアプリ。ないか、一つに決まっていなければ ""。 */
+        fun clockApp(ctx: Context): String {
+            val alarms = Intent(AlarmClock.ACTION_SHOW_ALARMS)
+            val pkg = ctx.packageManager.resolveActivity(alarms, 0)?.activityInfo?.packageName ?: return ""
+            // 時計のアプリが複数あって標準が決まっていないと、選択画面(android)になる
+            return if (pkg == "android") "" else pkg
+        }
     }
 }

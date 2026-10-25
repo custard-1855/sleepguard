@@ -295,6 +295,17 @@ class GuardTest {
         assertEquals(ASK, tick("01:10", unlocked))
     }
 
+    private val CLOCK = "com.example.clock"
+    private fun usingClock(app: String) = using(app).copy(clockApp = CLOCK)
+
+    @Test
+    fun `時計のアプリが前面にあるあいだはロックせず、ほかのアプリに移ったら確認画面を出す`() {
+        tick("01:00", unlocked)
+        assertEquals(emptyList<String>(), tick("01:10", usingClock(CLOCK)))
+        assertEquals(emptyList<String>(), tick("03:00", usingClock(CLOCK)))
+        assertEquals(ASK, tick("03:01", usingClock("com.android.launcher")))
+    }
+
     @Test
     fun `22時から6時までは毎分0秒すぎに評価し、日中は22時まで空ける`() {
         fun next(time: String) = at(time).plus(Schedule.untilNextTick(at(time))).toString()

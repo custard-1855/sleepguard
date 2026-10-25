@@ -19,7 +19,7 @@ import java.time.LocalDateTime
  * 画面ロック用のユーザー補助サービス。システムが常に接続しておくので、常駐の通知なしで動き続けられる。
  * ここで22時〜6時は毎分(と画面点灯・ロック解除時に)時間割を評価し、通知と画面ロックを行う。
  * 再起動やアプリの更新のあともシステムが接続し直す。画面の内容は読まず、通信にも一切関与しない。
- * 画面の切り替えのイベントからは、前面にあるアプリの名前だけを読む(「音声を聴く」で選んだアプリを使っているかの判定のため)。
+ * 画面の切り替えのイベントからは、前面にあるアプリの名前だけを読む(「音声を聴く」で選んだアプリや時計のアプリを使っているかの判定のため)。
  */
 class LockService : AccessibilityService() {
 
@@ -107,6 +107,7 @@ class LockService : AccessibilityService() {
                 audioMode == AudioManager.MODE_IN_COMMUNICATION,
             foreground = state.foreground,
             gateShown = GateActivity.shown,
+            clockApp = GateActivity.clockApp(this),
         )
     }
 
