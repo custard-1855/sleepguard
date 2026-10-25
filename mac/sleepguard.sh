@@ -98,7 +98,10 @@ lock_screen() {
 }
 
 # ---- 本体 ----
-once "cleanup-$DAY" && find "$STATE_DIR" -type f -mtime +3 -delete 2>/dev/null
+# 消すのはこのスクリプトが作るファイルだけ(サブディレクトリには降りない)
+once "cleanup-$DAY" && find "$STATE_DIR" -maxdepth 1 -type f \
+  \( -name 'once-*' -o -name 'bath-*' -o -name 'last-bath-*' -o -name 'late-*' \) \
+  -mtime +3 -delete 2>/dev/null
 
 if (( HM >= BATH_START && HM <= BATH_END )); then
   check_idle
