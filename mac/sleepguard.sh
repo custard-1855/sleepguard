@@ -24,9 +24,25 @@ ACTIVE_IDLE=120            # 無操作がこの秒数未満なら「使用中」
 LOCK_GRACE=600             # 1時以降の通知からこの秒数たっても使用中なら画面ロック
 # ============================================================
 
-STATE_DIR=${SG_STATE_DIR:-/var/db/sleepguard}
-DRY_RUN=${SG_DRY_RUN:-0}
-NOW=${SG_NOW:-$(date +%s)}
+# root(launchd から起動)のときは SG_* をすべて無視する。
+# 一般ユーザーのときは、テスト用に SG_DRY_RUN=1 と SG_STATE_DIR を指定した場合だけ動く。
+if (( EUID == 0 )); then
+  STATE_DIR=/var/db/sleepguard
+  DRY_RUN=0
+  NOW=$(date +%s)
+  CU=$(stat -f %Su /dev/console 2>/dev/null)
+  IDLE_OVERRIDE=
+else
+  if [ "${SG_DRY_RUN:-}" != 1 ] || [ -z "${SG_STATE_DIR:-}" ]; then
+    echo "sleepguard: root 以外で実行するときは SG_DRY_RUN=1 と SG_STATE_DIR の指定が必要です" >&2
+    exit 1
+  fi
+  STATE_DIR=$SG_STATE_DIR
+  DRY_RUN=1
+  NOW=${SG_NOW:-$(date +%s)}
+  CU=${SG_USER:-$(stat -f %Su /dev/console 2>/dev/null)}
+  IDLE_OVERRIDE=${SG_IDLE:-}
+fi
 
 log() { echo "$(date '+%F %T') $*"; }
 fmt() { date -r "$NOW" "+$1" 2>/dev/null || date -d "@$NOW" "+$1"; }
@@ -39,10 +55,9 @@ HM=$((10#$HM))
 mkdir -p "$STATE_DIR"
 
 # ---- 使用状況 ----
-CU=${SG_USER:-$(stat -f %Su /dev/console 2>/dev/null)}
 CUID=$(id -u "$CU" 2>/dev/null || echo "")
 idle_secs() {
-  if [ -n "${SG_IDLE:-}" ]; then echo "$SG_IDLE"; return; fi
+  if [ -n "$IDLE_OVERRIDE" ]; then echo "$IDLE_OVERRIDE"; return; fi
   ioreg -r -d 1 -k HIDIdleTime -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}'
 }
 check_idle() { # IDLE と ACTIVE を設定する(必要な時間帯だけ呼ぶ)
