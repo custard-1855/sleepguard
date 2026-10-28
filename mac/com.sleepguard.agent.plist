@@ -8,18 +8,10 @@
   <array>
     <string>/Library/Application Support/SleepGuard/sleepguard.sh</string>
   </array>
-  <!-- 22時〜6時の間だけ毎分起動する(Minute を省くと、その時の毎分になる) -->
-  <key>StartCalendarInterval</key>
-  <array>
-    <dict><key>Hour</key><integer>22</integer></dict>
-    <dict><key>Hour</key><integer>23</integer></dict>
-    <dict><key>Hour</key><integer>0</integer></dict>
-    <dict><key>Hour</key><integer>1</integer></dict>
-    <dict><key>Hour</key><integer>2</integer></dict>
-    <dict><key>Hour</key><integer>3</integer></dict>
-    <dict><key>Hour</key><integer>4</integer></dict>
-    <dict><key>Hour</key><integer>5</integer></dict>
-  </array>
+  <!-- 毎分起動する。22時〜6時の外ではスクリプトがすぐ終わる。
+       StartCalendarInterval で Minute を省いても毎分にはならず、毎時0分に1回しか起動しない -->
+  <key>StartInterval</key>
+  <integer>60</integer>
   <key>RunAtLoad</key>
   <true/>
   <key>AbandonProcessGroup</key>

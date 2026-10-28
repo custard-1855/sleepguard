@@ -30,7 +30,7 @@ sudo ./install.sh      # 入れる
 sudo ./uninstall.sh    # 外す
 ```
 
-`install.sh` は次の2つを root:wheel の所有で置き、launchd(root)から `sleepguard.sh` を22時〜6時の間だけ毎分実行させます。常駐するプロセスはなく、日中は起動もしません。
+`install.sh` は次の2つを root:wheel の所有で置き、launchd(root)から `sleepguard.sh` を毎分実行させます。常駐するプロセスはなく、22時〜6時の外ではスクリプトが時刻を見てすぐ終わります。
 
 - `/Library/Application Support/SleepGuard/sleepguard.sh`
 - `/Library/LaunchDaemons/com.sleepguard.agent.plist`
@@ -56,8 +56,6 @@ sudo ./uninstall.sh    # 外す
 | `LOCK_GRACE` | 600 | 1時以降の通知から画面ロックまでの猶予(秒) |
 
 時刻は HHMM を数値で書きます。先頭の0は付けません(1:00 なら `100`)。
-
-22時より前や6時以降に広げるときは、`com.sleepguard.agent.plist` の `StartCalendarInterval` にもその時(Hour)を足してください。
 
 ### ログと動作確認
 
