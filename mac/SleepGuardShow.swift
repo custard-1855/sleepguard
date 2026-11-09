@@ -8,7 +8,8 @@
 //   --text 文           ファイルを読まずにこの文を出す
 //   --no-record         出した文を記録しない(プレビュー用)
 //   --away SECONDS      入浴の画面で、これだけ離席したら入浴済みとみなして閉じる(省略時は 900)
-//   --quick             15秒・30秒・2分の待ち時間を 2秒・4秒・20秒に、--away を 10秒にする(プレビュー用)
+//   --grace SECONDS     入浴の画面で、半透明になってから背景が真っ暗に戻るまでの猶予(省略時は 300)
+//   --quick             15秒・30秒・2分の待ち時間を 2秒・4秒・20秒に、--away を 10秒、--grace を 12秒にする(プレビュー用)
 // 終了コード: 0 閉じた / 自動で閉じた、2 「入浴済み」を押した、3 離席したので入浴済みとみなした、1 引数の誤り
 //
 // 表示の流れ:
@@ -16,6 +17,8 @@
 //   15秒  背景が半透明になり、クリックもキーも下のアプリに素通しする。まだ閉じられない
 //   30秒  画面下にバーが出る。就寝なら「閉じる」、入浴なら「入浴済み」だけ。閉じるのはこのボタンだけ
 //   2分   就寝の画面は自動で閉じる。入浴の画面は閉じるまで残り、離席が --away 秒に達したら入浴済みとして閉じる
+// 入浴の画面は、半透明になってから --grace 秒かけて背景が濃くなり、最後は真っ暗に戻る(下のアプリは見えなくなる)。
+// この間が保存と区切りの猶予で、残り時間を時刻の横に出す。クリックとキーは通したままなので Cmd+S などは効く。
 // 止める裏技はプロセスを kill するだけ(解除対策はしない方針)。
 
 import AppKit
@@ -33,10 +36,11 @@ struct Options {
     var record = true
     var quick = false
     var away = 900.0
+    var grace = 300.0
 }
 
 func usage() -> Never {
-    let s = "使い方: sleepguard-show --kind bath|sleep --band H:MM [--day YYYYMMDD] [--messages PATH] [--text 文] [--no-record] [--away SECONDS] [--quick]\n"
+    let s = "使い方: sleepguard-show --kind bath|sleep --band H:MM [--day YYYYMMDD] [--messages PATH] [--text 文] [--no-record] [--away SECONDS] [--grace SECONDS] [--quick]\n"
     FileHandle.standardError.write(s.data(using: .utf8)!)
     exit(1)
 }
@@ -65,6 +69,9 @@ func parseOptions() -> Options {
         case "--away":
             guard let n = Double(value()), n > 0 else { usage() }
             o.away = n
+        case "--grace":
+            guard let n = Double(value()), n > 0 else { usage() }
+            o.grace = n
         case "--quick": o.quick = true
         default: usage()
         }
@@ -177,6 +184,10 @@ final class Controller: NSObject, NSApplicationDelegate {
     var overlays: [NSWindow] = []
     var backdrops: [NSView] = []
     var bars: [NSWindow] = []
+    var clocks: [NSTextField] = []
+    var graceStart: Date? = nil      // 入浴の画面で、半透明になった時刻。ここから背景を濃くしていく
+    var grace = 300.0
+    let dimAlpha: CGFloat = 0.4      // 半透明になった直後の背景の濃さ
     var blocking = true
     let previous = NSWorkspace.shared.frontmostApplication   // 起動前に前面だったアプリ
 
@@ -188,6 +199,7 @@ final class Controller: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ note: Notification) {
         let (t1, t2, t3) = opt.quick ? (2.0, 4.0, 20.0) : (15.0, 30.0, 120.0)
         let away = opt.quick ? 10.0 : opt.away
+        grace = opt.quick ? 12.0 : opt.grace
         for screen in NSScreen.screens { makeOverlay(on: screen) }
         NSApp.activate(ignoringOtherApps: true)
         for w in overlays { w.makeKeyAndOrderFront(nil) }
@@ -199,6 +211,7 @@ final class Controller: NSObject, NSApplicationDelegate {
                                                name: NSApplication.didResignActiveNotification, object: nil)
         DispatchQueue.main.asyncAfter(deadline: .now() + t1) { self.letThrough() }
         DispatchQueue.main.asyncAfter(deadline: .now() + t2) { self.showBars() }
+        Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { _ in self.tick() }
         if opt.kind == "bath" {
             // 入浴の画面は自動では閉じない。保存などを済ませてお風呂へ行くまで残す。
             // 離席が away 秒に達したら、お風呂に行ったとみなして閉じる
@@ -247,13 +260,15 @@ final class Controller: NSObject, NSApplicationDelegate {
         root.addSubview(label)
 
         // 現在時刻
-        let f = DateFormatter(); f.dateFormat = "H:mm"
-        let clock = NSTextField(labelWithString: f.string(from: Date()))
+        // 幅いっぱいに置いて中央揃えにする。あとで文字を書き換えても位置がずれない
+        let clock = NSTextField(labelWithString: clockText())
         clock.font = font(size * 0.45)
         clock.textColor = NSColor(white: 0.5, alpha: 1)
+        clock.alignment = .center
         clock.sizeToFit()
-        clock.frame.origin = NSPoint(x: (frame.width - clock.frame.width) / 2, y: label.frame.minY - size * 1.6)
+        clock.frame = NSRect(x: 0, y: label.frame.minY - size * 1.6, width: frame.width, height: clock.frame.height)
         root.addSubview(clock)
+        clocks.append(clock)
 
         w.contentView = root
         w.makeFirstResponder(root)
@@ -273,8 +288,9 @@ final class Controller: NSObject, NSApplicationDelegate {
         blocking = false
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.8
-            for b in self.backdrops { b.animator().alphaValue = 0.4 }
+            for b in self.backdrops { b.animator().alphaValue = self.dimAlpha }
         }
+        if opt.kind == "bath" { graceStart = Date() }
         for w in overlays { w.ignoresMouseEvents = true }
         if let prev = previous, prev.processIdentifier != ProcessInfo.processInfo.processIdentifier {
             if #available(macOS 14.0, *) { NSApp.yieldActivation(to: prev) }
@@ -282,6 +298,28 @@ final class Controller: NSObject, NSApplicationDelegate {
         } else {
             NSApp.deactivate()
         }
+    }
+
+    /// 現在時刻。入浴の画面の猶予中は、真っ暗に戻るまでの残り時間を添える
+    func clockText() -> String {
+        let f = DateFormatter(); f.dateFormat = "H:mm"
+        var s = f.string(from: Date())
+        if let start = graceStart {
+            let left = Int((grace - Date().timeIntervalSince(start)).rounded(.up))
+            if left > 0 { s += String(format: "  あと %d:%02d", left / 60, left % 60) }
+        }
+        return s
+    }
+
+    /// 毎秒: 時刻を更新する。入浴の画面は、猶予の経過に合わせて背景を濃くし、猶予が切れたら真っ暗にする
+    func tick() {
+        let s = clockText()
+        for c in clocks { c.stringValue = s }
+        guard let start = graceStart else { return }
+        let elapsed = Date().timeIntervalSince(start)
+        guard elapsed >= 1 else { return }   // 半透明にするアニメーションが終わるまで待つ
+        let p = CGFloat(min(1, elapsed / grace))
+        for b in backdrops { b.alphaValue = dimAlpha + (1 - dimAlpha) * p }
     }
 
     /// 30秒後: 画面下にボタンのバーを出す
