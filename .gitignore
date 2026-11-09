@@ -15,3 +15,6 @@ android/captures/
 # IDE
 .idea/
 *.iml
+
+# Mac: preview.sh がコンパイルしたバイナリ
+mac/.build/
