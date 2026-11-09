@@ -281,14 +281,6 @@ class GuardTest {
         assertEquals(ASK, tick("00:10", unlocked))
     }
 
-    @Test
-    fun `Cosenseのアプリも、音声のアプリと同じように前面にあるあいだはロックしない`() {
-        State(store).setChosen(ChosenApp.COSENSE, "com.example.cosense")
-        tick("00:00", unlocked)
-        assertEquals(emptyList<String>(), tick("00:10", using("com.example.cosense")))
-        assertEquals(ASK, tick("00:11", using("com.android.chrome")))
-    }
-
     private val PHONE = "com.example.phone"
     private fun usingPhone(app: String) = using(app).copy(phoneApp = PHONE)
 

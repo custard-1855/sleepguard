@@ -53,7 +53,6 @@ object Schedule {
  */
 enum class ChosenApp(val key: String, val open: String, val label: String) {
     SOUND("soundApp", "音声を聴く", "音声のアプリ"),
-    COSENSE("cosenseApp", "Cosenseを開く", "Cosenseのアプリ"),
 }
 
 /** State の保存先。未保存のキーは "" と 0 を返す。 */
