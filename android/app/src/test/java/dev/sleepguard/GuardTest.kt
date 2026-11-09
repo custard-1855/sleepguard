@@ -40,7 +40,7 @@ class GuardTest {
     private fun using(app: String) = unlocked.copy(foreground = app)
 
     init {
-        State(store).soundApp = AUDIO
+        State(store).setChosen(ChosenApp.SOUND, AUDIO)
     }
 
     private var deviceReads = 0
@@ -248,27 +248,9 @@ class GuardTest {
     }
 
     @Test
-    fun `確認画面からロックするときは、緊急時の案内つきの通知を出してロックする`() {
+    fun `確認画面からロックするときは、電話の案内つきの通知を出してロックする`() {
         guard.lockNow()
         assertEquals(LOCK, fx.log)
-    }
-
-    @Test
-    fun `緊急解除すると30分はロックせず、そのあとはまた確認画面を出す`() {
-        tick("01:00", unlocked)
-        tick("01:10", unlocked)
-        guard.emergency(at("01:10"), at("01:10").toEpochSecond(ZoneOffset.UTC) * 1000)
-        assertEquals(emptyList<String>(), tick("01:11", unlocked))
-        assertEquals(emptyList<String>(), tick("01:39", unlocked))
-        assertEquals(ASK, tick("01:40", unlocked))
-    }
-
-    @Test
-    fun `緊急解除は何度でも使え、使った時刻を最後に使った夜の分だけ記録する`() {
-        guard.emergency(at("2026-10-24T01:30"), 0)
-        guard.emergency(at("02:14"), 0)
-        guard.emergency(at("03:05"), 0)
-        assertEquals("2026-10-24 2:14 3:05", State(store).emergencyLog)
     }
 
     @Test
@@ -290,9 +272,28 @@ class GuardTest {
 
     @Test
     fun `音声のアプリを選んでいなければ、前面のアプリがわからなくても見逃さない`() {
-        State(store).soundApp = ""
+        State(store).setChosen(ChosenApp.SOUND, "")
         tick("01:00", unlocked)
         assertEquals(ASK, tick("01:10", unlocked))
+    }
+
+    @Test
+    fun `Cosenseのアプリも、音声のアプリと同じように前面にあるあいだはロックしない`() {
+        State(store).setChosen(ChosenApp.COSENSE, "com.example.cosense")
+        tick("01:00", unlocked)
+        assertEquals(emptyList<String>(), tick("01:10", using("com.example.cosense")))
+        assertEquals(ASK, tick("01:11", using("com.android.chrome")))
+    }
+
+    private val PHONE = "com.example.phone"
+    private fun usingPhone(app: String) = using(app).copy(phoneApp = PHONE)
+
+    @Test
+    fun `電話のアプリが前面にあるあいだはロックせず、ほかのアプリに移ったら確認画面を出す`() {
+        tick("01:00", unlocked)
+        assertEquals(emptyList<String>(), tick("01:10", usingPhone(PHONE)))
+        assertEquals(emptyList<String>(), tick("03:00", usingPhone(PHONE)))
+        assertEquals(ASK, tick("03:01", usingPhone("com.android.chrome")))
     }
 
     private val CLOCK = "com.example.clock"

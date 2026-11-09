@@ -8,16 +8,17 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.AlarmClock
+import android.telecom.TelecomManager
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
-import java.time.LocalDateTime
 
 /**
  * ロックの対象になったとき、ロックする代わりに出す確認画面。
+ * ロックするか、夜中も使えるアプリ(選んだアプリ、電話、時計)を開くかを選ぶ。
  * 10秒操作がないか、戻る・ホーム・履歴で離れたらロックする。
  */
 class GateActivity : Activity() {
@@ -29,7 +30,6 @@ class GateActivity : Activity() {
     /** ロック以外で閉じるとき true。onStop でロックしないようにする。 */
     private var resolved = false
 
-    private var idleArmed = false
     private val idle = Runnable { lockAndFinish() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -67,18 +67,10 @@ class GateActivity : Activity() {
         if (!resolved) lockAndFinish()
     }
 
-    override fun onUserInteraction() {
-        if (idleArmed) armIdle()
-    }
+    override fun onUserInteraction() = armIdle()
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() = lockAndFinish()
-
-    private fun page(title: String, text: String) {
-        col.removeAllViews()
-        add(TextView(this).apply { this.text = title; textSize = 24f })
-        add(TextView(this).apply { this.text = text; textSize = 15f })
-    }
 
     private fun add(v: android.view.View) = col.addView(
         v, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -90,23 +82,25 @@ class GateActivity : Activity() {
     }.also { add(it) }
 
     private fun showChoice() {
-        page("もう寝る時間です", "画面をロックします。")
+        add(TextView(this).apply { text = "もう寝る時間です"; textSize = 24f })
+        add(TextView(this).apply { text = "画面をロックします。"; textSize = 15f })
         button("ロックする") { lockAndFinish() }
-        button("緊急で使う") { showConfirm() }
+        // 以下のアプリは、開いたアプリが前面にある間はロックしない(Guard が前面のアプリで判定する)
         val state = State(this)
-        val sound = state.soundApp.takeIf { it != "" }?.let { packageManager.getLaunchIntentForPackage(it) }
-        if (sound != null) {
-            // 開いたアプリが前面にある間はロックしない(Guard が前面のアプリで判定する)
-            button("音声を聴く") { open(sound) }
+        for (app in ChosenApp.values()) {
+            launch(state.chosen(app))?.let { button(app.open) { open(it) } }
         }
-        // 時計のアプリが前面にある間もロックしない。アラームの一覧の intent は SET_ALARM の権限を求める機種があるので、
-        // ホーム画面から開くときと同じ intent で開く
-        val clock = clockApp(this).takeIf { it != "" }?.let { packageManager.getLaunchIntentForPackage(it) }
-        if (clock != null) button("アラームを設定") { open(clock) }
+        launch(phoneApp(this))?.let { button("電話をかける") { open(it) } }
+        // アラームの一覧の intent は SET_ALARM の権限を求める機種があるので、ホーム画面から開くときと同じ intent で開く
+        launch(clockApp(this))?.let { button("アラームを設定") { open(it) } }
         armIdle()
     }
 
-    /** 音声か時計のアプリを開く。開けなければロックする。ここで落ちると、ユーザー補助サービスごと止まってしまう。 */
+    /** pkg をホーム画面から開くときと同じ intent。pkg が "" か、入っていなければ null。 */
+    private fun launch(pkg: String): Intent? =
+        pkg.takeIf { it != "" }?.let { packageManager.getLaunchIntentForPackage(it) }
+
+    /** アプリを開く。開けなければロックする。ここで落ちると、ユーザー補助サービスごと止まってしまう。 */
     private fun open(intent: Intent) {
         try {
             startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -117,53 +111,9 @@ class GateActivity : Activity() {
         finish()
     }
 
-    private fun showConfirm() {
-        page(
-            "本当に緊急ですか?",
-            "朝まで待てないことだけに使ってください。110・119 は、ロック画面の「緊急通報」から待たずにかけられます。",
-        )
-        button("やっぱり寝る") { lockAndFinish() }
-        button("緊急です") { showCountdown() }
-        armIdle()
-    }
-
-    /** 30秒待ってから解除できるようにする。待っている間は操作がなくてもロックしない。 */
-    private fun showCountdown() {
-        disarmIdle()
-        page("", "解除すると、30分はロックしません。")
-        val title = col.getChildAt(0) as TextView
-        button("やっぱり寝る") { lockAndFinish() }
-        val unlock = button("解除する") {
-            guard.emergency(LocalDateTime.now(), System.currentTimeMillis())
-            resolved = true
-            finish()
-        }.apply { isEnabled = false }
-        val until = System.currentTimeMillis() + Schedule.EMERGENCY_WAIT_MS
-        val count = object : Runnable {
-            override fun run() {
-                val left = (until - System.currentTimeMillis() + 999) / 1000
-                if (left > 0) {
-                    title.text = "${left}秒後に解除できます"
-                    main.postDelayed(this, 1000)
-                } else {
-                    title.text = "解除できます"
-                    unlock.isEnabled = true
-                    armIdle()
-                }
-            }
-        }
-        count.run()
-    }
-
     private fun armIdle() {
-        idleArmed = true
         main.removeCallbacks(idle)
         main.postDelayed(idle, Schedule.GATE_IDLE_MS)
-    }
-
-    private fun disarmIdle() {
-        idleArmed = false
-        main.removeCallbacks(idle)
     }
 
     private fun lockAndFinish() {
@@ -184,5 +134,9 @@ class GateActivity : Activity() {
             // 時計のアプリが複数あって標準が決まっていないと、選択画面(android)になる
             return if (pkg == "android") "" else pkg
         }
+
+        /** 端末の標準の電話のアプリ。なければ ""。 */
+        fun phoneApp(ctx: Context): String =
+            ctx.getSystemService(TelecomManager::class.java)?.defaultDialerPackage ?: ""
     }
 }

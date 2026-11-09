@@ -22,13 +22,11 @@ object Schedule {
     const val LOCK_GRACE_MS = 10 * 60_000L      // 1時以降の通知から画面ロックまでの猶予
     const val ASK_TIMEOUT_MS = 15_000L          // 確認画面が出なかったとみなしてロックするまで
     const val GATE_IDLE_MS = 10_000L            // 確認画面で操作がなければロックするまで
-    const val EMERGENCY_WAIT_MS = 30_000L       // 緊急解除のカウントダウン
-    const val EMERGENCY_MS = 30 * 60_000L       // 緊急解除してからロックしない時間
     const val GO_OUT_WAIT_MS = 10_000L          // 「今夜は外出」の確認のカウントダウン
 
     fun hm(t: LocalDateTime) = t.hour * 100 + t.minute
 
-    /** 1時〜6時。外出モードに入ること、停止すること、音声のアプリを変えることはできない。 */
+    /** 1時〜6時。外出モードに入ること、停止すること、確認画面から開くアプリを変えることはできない。 */
     fun isLate(t: LocalDateTime) = hm(t) in LATE_START until LATE_END
 
     fun canGoOut(t: LocalDateTime) = !isLate(t)
@@ -47,6 +45,15 @@ object Schedule {
             t.truncatedTo(ChronoUnit.MINUTES).plusMinutes(1)
         return Duration.between(t, next).plusMillis(500)
     }
+}
+
+/**
+ * 確認画面から開けるアプリのうち、アプリ画面でホーム画面のアプリの一覧から選ぶもの。
+ * open は確認画面のボタン名、label はアプリ画面での呼び名。電話と時計は選ばせず、端末の標準のアプリを開く。
+ */
+enum class ChosenApp(val key: String, val open: String, val label: String) {
+    SOUND("soundApp", "音声を聴く", "音声のアプリ"),
+    COSENSE("cosenseApp", "Cosenseを開く", "Cosenseのアプリ"),
 }
 
 /** State の保存先。未保存のキーは "" と 0 を返す。 */
@@ -107,22 +114,12 @@ class State(private val p: Store) {
         get() = p.getLong("askedAt")
         set(v) = p.putLong("askedAt", v)
 
-    /** 緊急解除でロックしない期限。 */
-    var emergencyUntil: Long
-        get() = p.getLong("emergencyUntil")
-        set(v) = p.putLong("emergencyUntil", v)
+    /** 確認画面の app のボタンで開くアプリのパッケージ名。アプリ画面で選ぶ。選んでいなければ ""。 */
+    fun chosen(app: ChosenApp) = p.getString(app.key)
+    fun setChosen(app: ChosenApp, pkg: String) = p.putString(app.key, pkg)
 
-    /** 最後に緊急解除を使った夜と、その夜に使った時刻("2026-10-24 2:14 3:05")。 */
-    val emergencyLog get() = p.getString("emergencyLog")
-    fun addEmergency(night: LocalDate, time: String) {
-        val log = emergencyLog
-        p.putString("emergencyLog", if (log.startsWith("$night ")) "$log $time" else "$night $time")
-    }
-
-    /** 「音声を聴く」で開くアプリのパッケージ名。アプリ画面で選ぶ。選んでいなければ ""。 */
-    var soundApp: String
-        get() = p.getString("soundApp")
-        set(v) = p.putString("soundApp", v)
+    /** 選んであるアプリのパッケージ名。 */
+    val chosenApps: Set<String> get() = ChosenApp.values().map { chosen(it) }.filter { it != "" }.toSet()
 
     /**
      * 前面にあるアプリのパッケージ名。わからなければ ""。

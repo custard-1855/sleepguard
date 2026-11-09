@@ -25,7 +25,7 @@ class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private lateinit var goOutButton: Button
     private lateinit var comeHomeButton: Button
-    private lateinit var soundButton: Button
+    private lateinit var appButtons: List<Button>
     private lateinit var stopButton: Button
 
     private val main = Handler(Looper.getMainLooper())
@@ -63,7 +63,7 @@ class MainActivity : Activity() {
         button("今夜は入浴済み") { BathDoneReceiver.markBathDone(this); refresh() }
         goOutButton = button("今夜は外出") { confirmGoOut() }
         comeHomeButton = button("帰宅した") { OutingReceiver.comeHome(this); refresh() }
-        soundButton = button("音声のアプリを選ぶ") { chooseSoundApp() }
+        appButtons = ChosenApp.values().map { app -> button("${app.label}を選ぶ") { chooseApp(app) } }
         stopButton = button("停止") { confirmStop() }
 
         add(TextView(this).apply {
@@ -72,7 +72,7 @@ class MainActivity : Activity() {
                 22時〜 使用中は15分おきに入浴の通知
                 0時 寝る準備の通知、0:50 予告
                 1〜6時 使っていたら通知し、10分後に確認画面を出してロック
-                確認画面 緊急解除(30分)、音声を聴く
+                確認画面 音声・Cosense・電話・アラームのアプリは開ける
                 外出中 入浴の通知・予告・ロックなし
                 外出と停止は確認してから。1〜6時は押せない
                 1時以降に帰宅したら2時からロック
@@ -200,8 +200,8 @@ class MainActivity : Activity() {
         refresh()
     }
 
-    /** 「音声を聴く」で開くアプリを、ホーム画面のアプリの一覧から選ぶ。 */
-    private fun chooseSoundApp() {
+    /** 確認画面の app のボタンで開くアプリを、ホーム画面のアプリの一覧から選ぶ。 */
+    private fun chooseApp(app: ChosenApp) {
         val apps = packageManager.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
         ).map { it.activityInfo.packageName to it.loadLabel(packageManager).toString() }
@@ -209,20 +209,12 @@ class MainActivity : Activity() {
             .distinctBy { it.first }
             .sortedBy { it.second }
         AlertDialog.Builder(this)
-            .setTitle("音声を聴くで開くアプリ")
+            .setTitle("「${app.open}」で開くアプリ")
             .setItems((listOf("選ばない") + apps.map { it.second }).toTypedArray()) { _, i ->
-                State(this).soundApp = if (i == 0) "" else apps[i - 1].first
+                State(this).setChosen(app, if (i == 0) "" else apps[i - 1].first)
                 refresh()
             }
             .show()
-    }
-
-    /** "2026-10-24 2:14 3:05" を "10/24の夜 2:14, 3:05" にする。 */
-    private fun emergencyText(log: String): String {
-        if (log == "") return "—"
-        val parts = log.split(" ")
-        val night = java.time.LocalDate.parse(parts[0])
-        return "${night.monthValue}/${night.dayOfMonth}の夜 ${parts.drop(1).joinToString(", ")}"
     }
 
     private fun refresh() {
@@ -236,7 +228,7 @@ class MainActivity : Activity() {
         goOutButton.isEnabled = !outing && Schedule.canGoOut(now)
         comeHomeButton.isEnabled = outing
         // 1時〜6時に変えると、その場でロックを抜けられてしまうので変えさせない
-        soundButton.isEnabled = !Schedule.isLate(now)
+        appButtons.forEach { it.isEnabled = !Schedule.isLate(now) }
         stopButton.isEnabled = state.enabled && Schedule.canStop(now)
         fun mark(b: Boolean) = if (b) "✓" else "—"
         statusView.text = """
@@ -245,9 +237,9 @@ class MainActivity : Activity() {
             開始        ${mark(state.enabled)}
             今夜の入浴  ${if (bath) "済み" else "まだ"}
             今夜の外出  ${if (outing) "外出中" else "—"}
-            音声のアプリ  ${if (state.soundApp != "") "選択済み" else "—"}
-            緊急解除    ${emergencyText(state.emergencyLog)}
-        """.trimIndent()
+        """.trimIndent() + ChosenApp.values().joinToString("") {
+            "\n${it.label}  ${if (state.chosen(it) != "") "選択済み" else "—"}"
+        }
     }
 
     companion object {

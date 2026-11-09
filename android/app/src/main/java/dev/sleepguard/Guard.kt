@@ -6,7 +6,7 @@ import java.time.LocalDateTime
 /**
  * tick のたびに読み直す端末の状態。
  * foreground は前面にあるアプリのパッケージ名(わからなければ "")、gateShown は確認画面を出しているかどうか。
- * clockApp は端末の標準の時計のアプリのパッケージ名(わからなければ "")。
+ * clockApp と phoneApp は端末の標準の時計と電話のアプリのパッケージ名(わからなければ "")。
  */
 data class Device(
     val screenOn: Boolean,
@@ -15,6 +15,7 @@ data class Device(
     val foreground: String = "",
     val gateShown: Boolean = false,
     val clockApp: String = "",
+    val phoneApp: String = "",
 )
 
 /** 時間割の評価結果として起こすこと。 */
@@ -93,12 +94,11 @@ class Guard(private val state: State, private val fx: Effects) {
         }
     }
 
-    /** ロックの対象になったとき。緊急解除中と、音声か時計のアプリが前面にある間は見逃し、それ以外は確認画面を出す。 */
+    /** ロックの対象になったとき。確認画面から開けるアプリが前面にある間は見逃し、それ以外は確認画面を出す。 */
     private fun askOrLock(night: LocalDate, ms: Long, device: Device) {
-        if (ms < state.emergencyUntil) return
         val fg = device.foreground
-        if (fg != "" && (fg == state.soundApp || fg == device.clockApp)) {
-            // 確認画面から音声か時計のアプリに移った。確認画面を出せなかったときのロックはしない
+        if (fg != "" && (fg in state.chosenApps || fg == device.clockApp || fg == device.phoneApp)) {
+            // 確認画面から開けるアプリに移った。確認画面を出せなかったときのロックはしない
             if (state.askedAt != 0L) state.askedAt = 0
             return
         }
@@ -128,19 +128,11 @@ class Guard(private val state: State, private val fx: Effects) {
     fun lockNow() {
         fx.post(
             "画面をロックします",
-            "もう寝ましょう。緊急時は電源ボタンを素早く5回押すと緊急SOS(要設定)、" +
-                "ロック画面の「緊急通報」から110・119にかけられます。",
+            "もう寝ましょう。電話はロックを解除して確認画面の「電話をかける」から、" +
+                "110・119 はロック画面の「緊急通報」からかけられます。",
         )
         fx.lock()
     }
-
-    /** 確認画面の緊急解除。30分ロックせず、使った時刻を記録する。 */
-    fun emergency(now: LocalDateTime, ms: Long) {
-        state.askedAt = 0
-        state.emergencyUntil = ms + Schedule.EMERGENCY_MS
-        state.addEmergency(Schedule.nightOf(now), "${now.hour}:%02d".format(now.minute))
-    }
-
 
     /** 「外出中」「今夜は外出」。その夜だけ外出モードにする。 */
     fun goOut(now: LocalDateTime) {
