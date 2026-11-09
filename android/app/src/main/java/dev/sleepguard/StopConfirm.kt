@@ -5,7 +5,7 @@ import java.time.LocalDateTime
 /** 「停止」の確認の流れ。文言を変えて3回聞き、3回目で停止する。Android には触らない。 */
 class StopConfirm {
 
-    /** NEXT は次の確認を出す、TOO_LATE は確認の途中で1時を過ぎたので停止しない。 */
+    /** NEXT は次の確認を出す、TOO_LATE は確認の途中で0時を過ぎたので停止しない。 */
     enum class Result { NEXT, STOP, TOO_LATE }
 
     private var step = 0
@@ -18,7 +18,7 @@ class StopConfirm {
 
     /** 確認の「停止する」。 */
     fun stop(now: LocalDateTime): Result {
-        // 0:59 に確認を始めて 1時すぎに押し切る、を防ぐ
+        // 23:59 に確認を始めて 0時すぎに押し切る、を防ぐ
         if (!Schedule.canStop(now)) {
             step = 0
             return Result.TOO_LATE

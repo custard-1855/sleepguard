@@ -56,54 +56,59 @@ class GuardTest {
     }
 
     @Test
-    fun `日中と0時台は端末の状態を読まない`() {
+    fun `日中は端末の状態を読まない`() {
         tick("12:00", unlocked)
-        tick("00:10", unlocked)
-        tick("00:55", unlocked)
+        tick("21:59", unlocked)
         assertEquals(0, deviceReads)
     }
 
     @Test
-    fun `1時以降に使っていたら通知し、10分後も使っていたら確認画面を出す`() {
-        assertEquals(listOf("1時を過ぎました"), tick("01:00", unlocked))
-        assertEquals(emptyList<String>(), tick("01:09", unlocked))
-        assertEquals(ASK, tick("01:10", unlocked))
+    fun `23時50分に一度だけ予告する`() {
+        assertEquals(listOf("まもなく0時です"), tick("23:50", lockScreen))
+        assertEquals(emptyList<String>(), tick("23:51", lockScreen))
+    }
+
+    @Test
+    fun `0時以降に使っていたら通知し、10分後も使っていたら確認画面を出す`() {
+        assertEquals(listOf("0時を過ぎました"), tick("00:00", unlocked))
+        assertEquals(emptyList<String>(), tick("00:09", unlocked))
+        assertEquals(ASK, tick("00:10", unlocked))
     }
 
     @Test
     fun `ロック後に時刻を見ようと画面を点けただけではロックしない`() {
-        tick("01:00", unlocked)
-        tick("01:10", unlocked)
-        assertEquals(emptyList<String>(), tick("02:30", lockScreen))
-        assertEquals(ASK, tick("02:31", unlocked))
+        tick("00:00", unlocked)
+        tick("00:10", unlocked)
+        assertEquals(emptyList<String>(), tick("01:30", lockScreen))
+        assertEquals(ASK, tick("01:31", unlocked))
     }
 
     @Test
     fun `ロック画面を見ただけでは10分の猶予が始まらない`() {
-        assertEquals(emptyList<String>(), tick("01:00", lockScreen))
-        assertEquals(listOf("1時を過ぎました"), tick("01:30", unlocked))
-        assertEquals(emptyList<String>(), tick("01:39", unlocked))
+        assertEquals(emptyList<String>(), tick("00:00", lockScreen))
+        assertEquals(listOf("0時を過ぎました"), tick("00:30", unlocked))
+        assertEquals(emptyList<String>(), tick("00:39", unlocked))
     }
 
     @Test
     fun `画面ロックが使えないときは、ロックできないことをその夜に一度だけ知らせる`() {
         fx.canLock = false
-        tick("01:00", unlocked)
-        assertEquals(listOf("画面をロックできません"), tick("01:10", unlocked))
-        assertEquals(emptyList<String>(), tick("01:11", unlocked))
+        tick("00:00", unlocked)
+        assertEquals(listOf("画面をロックできません"), tick("00:10", unlocked))
+        assertEquals(emptyList<String>(), tick("00:11", unlocked))
     }
 
     @Test
     fun `入浴の通知は0時を過ぎて最初に一度だけ消す`() {
         assertEquals(listOf("入浴"), tick("2026-10-24T22:00", unlocked))
-        assertEquals(listOf("入浴を消す"), tick("01:00", lockScreen))
-        assertEquals(emptyList<String>(), tick("01:01", lockScreen))
+        assertEquals(listOf("入浴を消す"), tick("00:00", lockScreen))
+        assertEquals(emptyList<String>(), tick("00:01", lockScreen))
     }
 
     @Test
     fun `通話中はロックしない`() {
-        tick("01:00", unlocked)
-        assertEquals(emptyList<String>(), tick("01:10", unlocked.copy(inCall = true)))
+        tick("00:00", unlocked)
+        assertEquals(emptyList<String>(), tick("00:10", unlocked.copy(inCall = true)))
     }
 
     @Test
@@ -118,18 +123,17 @@ class GuardTest {
         fx.log.clear()
         guard.goOut(at("2026-10-24T22:05"))
         assertEquals(listOf("入浴を消す", "常駐:外出"), fx.log)
-        assertEquals(emptyList<String>(), tick("01:00", lockScreen))
+        assertEquals(emptyList<String>(), tick("00:00", lockScreen))
     }
 
     @Test
-    fun `外出中は0時の通知と1時以降の「2時までに」だけを出し、ロックしない`() {
+    fun `外出中は予告を出さず、0時以降の「1時までに」だけを出し、ロックしない`() {
         guard.goOut(at("2026-10-24T21:00"))
-        assertEquals(listOf("0時です"), tick("00:00", unlocked))
-        assertEquals(emptyList<String>(), tick("00:50", unlocked))
-        assertEquals(emptyList<String>(), tick("01:00", lockScreen))
-        assertEquals(listOf("外出中でも2時までには寝ましょう"), tick("01:05", unlocked))
-        assertEquals(emptyList<String>(), tick("01:15", unlocked))
-        assertEquals(emptyList<String>(), tick("02:30", unlocked))
+        assertEquals(emptyList<String>(), tick("2026-10-24T23:50", unlocked))
+        assertEquals(emptyList<String>(), tick("00:00", lockScreen))
+        assertEquals(listOf("外出中でも1時までには寝ましょう"), tick("00:05", unlocked))
+        assertEquals(emptyList<String>(), tick("00:15", unlocked))
+        assertEquals(emptyList<String>(), tick("01:30", unlocked))
     }
 
     @Test
@@ -148,47 +152,47 @@ class GuardTest {
     fun `外出モードは次の夜には切れている`() {
         guard.goOut(at("2026-10-24T21:00"))
         assertEquals(listOf("常駐:動作中", "入浴"), tick("22:00", unlocked))
-        assertEquals(listOf("入浴を消す", "1時を過ぎました"), tick("2026-10-26T01:00", unlocked))
+        assertEquals(listOf("入浴を消す", "0時を過ぎました"), tick("2026-10-26T00:00", unlocked))
     }
 
     @Test
-    fun `0時台に帰宅すると、普段どおり1時に通知して1時10分にロックする`() {
+    fun `23時台に帰宅すると、普段どおり23時50分に予告し、0時に通知して0時10分にロックする`() {
         guard.goOut(at("2026-10-24T21:00"))
+        guard.comeHome(at("2026-10-24T23:30"))
+        assertEquals(listOf("まもなく0時です"), tick("2026-10-24T23:50", lockScreen))
+        assertEquals(listOf("0時を過ぎました"), tick("00:00", unlocked))
+        assertEquals(ASK, tick("00:10", unlocked))
+    }
+
+    @Test
+    fun `0時台に帰宅すると、1時まではロックせず、1時に通知して1時10分にロックする`() {
+        guard.goOut(at("2026-10-24T21:00"))
+        fx.log.clear()
         guard.comeHome(at("00:30"))
-        assertEquals(listOf("まもなく1時です"), tick("00:50", unlocked))
+        assertEquals(listOf("常駐:動作中", "おかえりなさい"), fx.log)
+        assertEquals(emptyList<String>(), tick("00:31", unlocked))
+        assertEquals(emptyList<String>(), tick("00:59", unlocked))
         assertEquals(listOf("1時を過ぎました"), tick("01:00", unlocked))
+        assertEquals(emptyList<String>(), tick("01:09", unlocked))
         assertEquals(ASK, tick("01:10", unlocked))
     }
 
     @Test
-    fun `1時台に帰宅すると、2時まではロックせず、2時に通知して2時10分にロックする`() {
+    fun `1時以降に帰宅すると、その時点から通知して10分後にロックする`() {
         guard.goOut(at("2026-10-24T21:00"))
-        fx.log.clear()
         guard.comeHome(at("01:30"))
-        assertEquals(listOf("常駐:動作中", "おかえりなさい"), fx.log)
-        assertEquals(emptyList<String>(), tick("01:31", unlocked))
-        assertEquals(emptyList<String>(), tick("01:59", unlocked))
-        assertEquals(listOf("2時を過ぎました"), tick("02:00", unlocked))
-        assertEquals(emptyList<String>(), tick("02:09", unlocked))
-        assertEquals(ASK, tick("02:10", unlocked))
-    }
-
-    @Test
-    fun `2時以降に帰宅すると、その時点から通知して10分後にロックする`() {
-        guard.goOut(at("2026-10-24T21:00"))
-        guard.comeHome(at("02:30"))
-        assertEquals(listOf("2時を過ぎました"), tick("02:31", unlocked))
-        assertEquals(emptyList<String>(), tick("02:40", unlocked))
-        assertEquals(ASK, tick("02:41", unlocked))
+        assertEquals(listOf("1時を過ぎました"), tick("01:31", unlocked))
+        assertEquals(emptyList<String>(), tick("01:40", unlocked))
+        assertEquals(ASK, tick("01:41", unlocked))
     }
 
     @Test
     fun `外出モードでないときに帰宅したを押しても、ロックは先に延びない`() {
-        tick("01:00", unlocked)
+        tick("00:00", unlocked)
         fx.log.clear()
-        guard.comeHome(at("01:05"))
+        guard.comeHome(at("00:05"))
         assertEquals(emptyList<String>(), fx.log)
-        assertEquals(ASK, tick("01:10", unlocked))
+        assertEquals(ASK, tick("00:10", unlocked))
     }
 
     @Test
@@ -216,35 +220,35 @@ class GuardTest {
     }
 
     @Test
-    fun `1時から6時までは外出モードに入れない`() {
-        tick("01:00", unlocked)
+    fun `0時から6時までは外出モードに入れない`() {
+        tick("00:00", unlocked)
         fx.log.clear()
-        guard.goOut(at("01:05"))
+        guard.goOut(at("00:05"))
         assertEquals(emptyList<String>(), fx.log)
-        assertEquals(ASK, tick("01:10", unlocked))
+        assertEquals(ASK, tick("00:10", unlocked))
     }
 
     @Test
     fun `確認画面を出している間は何もしない`() {
-        tick("01:00", unlocked)
-        tick("01:10", unlocked)
-        assertEquals(emptyList<String>(), tick("01:11", unlocked.copy(gateShown = true)))
+        tick("00:00", unlocked)
+        tick("00:10", unlocked)
+        assertEquals(emptyList<String>(), tick("00:11", unlocked.copy(gateShown = true)))
     }
 
     @Test
     fun `確認画面を出せなかったら、次の評価でロックする`() {
-        tick("01:00", unlocked)
-        assertEquals(ASK, tick("01:10", unlocked))
-        assertEquals(LOCK, tick("01:11", unlocked))
-        assertEquals(ASK, tick("01:12", unlocked))
+        tick("00:00", unlocked)
+        assertEquals(ASK, tick("00:10", unlocked))
+        assertEquals(LOCK, tick("00:11", unlocked))
+        assertEquals(ASK, tick("00:12", unlocked))
     }
 
     @Test
     fun `確認画面が出る前に画面を消したら、次に使ったときにまた確認画面を出す`() {
-        tick("01:00", unlocked)
-        tick("01:10", unlocked)
-        assertEquals(emptyList<String>(), tick("01:11", lockScreen))
-        assertEquals(ASK, tick("01:12", unlocked))
+        tick("00:00", unlocked)
+        tick("00:10", unlocked)
+        assertEquals(emptyList<String>(), tick("00:11", lockScreen))
+        assertEquals(ASK, tick("00:12", unlocked))
     }
 
     @Test
@@ -255,34 +259,34 @@ class GuardTest {
 
     @Test
     fun `音声のアプリが前面にあるあいだは、時間に関係なくロックしない`() {
-        tick("01:00", unlocked)
-        assertEquals(emptyList<String>(), tick("01:10", using(AUDIO)))
-        assertEquals(emptyList<String>(), tick("03:00", using(AUDIO)))
+        tick("00:00", unlocked)
+        assertEquals(emptyList<String>(), tick("00:10", using(AUDIO)))
+        assertEquals(emptyList<String>(), tick("02:00", using(AUDIO)))
     }
 
     @Test
     fun `音声のアプリからほかのアプリに移ったら確認画面を出し、戻れば何度でも使える`() {
-        tick("01:00", unlocked)
-        tick("01:10", using(AUDIO))
-        assertEquals(ASK, tick("01:20", using("com.android.launcher")))
-        assertEquals(emptyList<String>(), tick("01:21", using(AUDIO).copy(gateShown = true)))
-        assertEquals(emptyList<String>(), tick("01:30", using(AUDIO)))
-        assertEquals(ASK, tick("01:40", using("com.android.chrome")))
+        tick("00:00", unlocked)
+        tick("00:10", using(AUDIO))
+        assertEquals(ASK, tick("00:20", using("com.android.launcher")))
+        assertEquals(emptyList<String>(), tick("00:21", using(AUDIO).copy(gateShown = true)))
+        assertEquals(emptyList<String>(), tick("00:30", using(AUDIO)))
+        assertEquals(ASK, tick("00:40", using("com.android.chrome")))
     }
 
     @Test
     fun `音声のアプリを選んでいなければ、前面のアプリがわからなくても見逃さない`() {
         State(store).setChosen(ChosenApp.SOUND, "")
-        tick("01:00", unlocked)
-        assertEquals(ASK, tick("01:10", unlocked))
+        tick("00:00", unlocked)
+        assertEquals(ASK, tick("00:10", unlocked))
     }
 
     @Test
     fun `Cosenseのアプリも、音声のアプリと同じように前面にあるあいだはロックしない`() {
         State(store).setChosen(ChosenApp.COSENSE, "com.example.cosense")
-        tick("01:00", unlocked)
-        assertEquals(emptyList<String>(), tick("01:10", using("com.example.cosense")))
-        assertEquals(ASK, tick("01:11", using("com.android.chrome")))
+        tick("00:00", unlocked)
+        assertEquals(emptyList<String>(), tick("00:10", using("com.example.cosense")))
+        assertEquals(ASK, tick("00:11", using("com.android.chrome")))
     }
 
     private val PHONE = "com.example.phone"
@@ -290,10 +294,10 @@ class GuardTest {
 
     @Test
     fun `電話のアプリが前面にあるあいだはロックせず、ほかのアプリに移ったら確認画面を出す`() {
-        tick("01:00", unlocked)
-        assertEquals(emptyList<String>(), tick("01:10", usingPhone(PHONE)))
-        assertEquals(emptyList<String>(), tick("03:00", usingPhone(PHONE)))
-        assertEquals(ASK, tick("03:01", usingPhone("com.android.chrome")))
+        tick("00:00", unlocked)
+        assertEquals(emptyList<String>(), tick("00:10", usingPhone(PHONE)))
+        assertEquals(emptyList<String>(), tick("02:00", usingPhone(PHONE)))
+        assertEquals(ASK, tick("02:01", usingPhone("com.android.chrome")))
     }
 
     private val CLOCK = "com.example.clock"
@@ -301,10 +305,10 @@ class GuardTest {
 
     @Test
     fun `時計のアプリが前面にあるあいだはロックせず、ほかのアプリに移ったら確認画面を出す`() {
-        tick("01:00", unlocked)
-        assertEquals(emptyList<String>(), tick("01:10", usingClock(CLOCK)))
-        assertEquals(emptyList<String>(), tick("03:00", usingClock(CLOCK)))
-        assertEquals(ASK, tick("03:01", usingClock("com.android.launcher")))
+        tick("00:00", unlocked)
+        assertEquals(emptyList<String>(), tick("00:10", usingClock(CLOCK)))
+        assertEquals(emptyList<String>(), tick("02:00", usingClock(CLOCK)))
+        assertEquals(ASK, tick("02:01", usingClock("com.android.launcher")))
     }
 
     @Test

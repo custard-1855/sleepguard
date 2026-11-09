@@ -13,20 +13,20 @@ import java.time.temporal.ChronoUnit
 object Schedule {
     // 時刻は HHMM の数値
     const val BATH_START = 2200       // 入浴通知の開始
-    const val WARN = 50               // 0:50 予告
-    const val LATE_START = 100        // 1:00 以降、使っていたら通知 → ロック
+    const val WARN = 2350             // 23:50 予告
+    const val LATE_START = 0          // 0:00 以降、使っていたら通知 → ロック
     const val LATE_END = 600          // 6:00 で終了(この時刻は含まない)
-    const val LATE_HOME_START = 200   // 1時以降に帰宅したら、2:00 からロックの対象にする
+    const val LATE_HOME_START = 100   // 0時以降に帰宅したら、1:00 からロックの対象にする
 
     const val BATH_INTERVAL_MS = 15 * 60_000L   // 入浴通知の再表示間隔
-    const val LOCK_GRACE_MS = 10 * 60_000L      // 1時以降の通知から画面ロックまでの猶予
+    const val LOCK_GRACE_MS = 10 * 60_000L      // 0時以降の通知から画面ロックまでの猶予
     const val ASK_TIMEOUT_MS = 15_000L          // 確認画面が出なかったとみなしてロックするまで
     const val GATE_IDLE_MS = 10_000L            // 確認画面で操作がなければロックするまで
     const val GO_OUT_WAIT_MS = 10_000L          // 「今夜は外出」の確認のカウントダウン
 
     fun hm(t: LocalDateTime) = t.hour * 100 + t.minute
 
-    /** 1時〜6時。外出モードに入ること、停止すること、確認画面から開くアプリを変えることはできない。 */
+    /** 0時〜6時。外出モードに入ること、停止すること、確認画面から開くアプリを変えることはできない。 */
     fun isLate(t: LocalDateTime) = hm(t) in LATE_START until LATE_END
 
     fun canGoOut(t: LocalDateTime) = !isLate(t)
@@ -89,7 +89,7 @@ class State(private val p: Store) {
     fun setOuting(night: LocalDate) = p.putString("outing", night.toString())
     fun clearOuting() = p.putString("outing", "")
 
-    /** 1時以降に「帰宅した」を押した夜。 */
+    /** 0時以降に「帰宅した」を押した夜。 */
     fun lateHome(night: LocalDate) = p.getString("lateHome") == night.toString()
     fun setLateHome(night: LocalDate) = p.putString("lateHome", night.toString())
 
@@ -130,7 +130,7 @@ class State(private val p: Store) {
         get() = p.getString("foreground")
         set(v) = p.putString("foreground", v)
 
-    /** 1時以降に初めて使っていた時刻(その夜のもの)。 */
+    /** 0時以降に初めて使っていた時刻(その夜のもの)。 */
     fun lateNight() = p.getString("lateNight")
     fun lateSince() = p.getLong("lateSince")
     fun startLate(night: LocalDate, now: Long) {

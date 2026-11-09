@@ -70,12 +70,12 @@ class MainActivity : Activity() {
             textSize = 13f
             text = """
                 22時〜 使用中は15分おきに入浴の通知
-                0時 寝る準備の通知、0:50 予告
-                1〜6時 使っていたら通知し、10分後に確認画面を出してロック
+                23:50 予告
+                0〜6時 使っていたら通知し、10分後に確認画面を出してロック
                 確認画面 音声・Cosense・電話・アラームのアプリは開ける
                 外出中 入浴の通知・予告・ロックなし
-                外出と停止は確認してから。1〜6時は押せない
-                1時以降に帰宅したら2時からロック
+                外出と停止は確認してから。0〜6時は押せない
+                0時以降に帰宅したら1時からロック
                 緊急時 電源ボタン5回で緊急SOS(端末の設定で有効に)
             """.trimIndent()
         })
@@ -130,7 +130,7 @@ class MainActivity : Activity() {
         if (!Schedule.canGoOut(now) || State(this).outing(Schedule.nightOf(now))) return
         val d = AlertDialog.Builder(this)
             .setTitle("今夜は外出しますか?")
-            .setMessage("今夜は入浴の通知・0:50の予告・1時のロックが止まります。")
+            .setMessage("今夜は入浴の通知・23:50の予告・0時のロックが止まります。")
             .setNegativeButton("やめる", null)
             .setPositiveButton("外出する") { _, _ -> OutingReceiver.goOut(this); refresh() }
             .show()
@@ -188,7 +188,7 @@ class MainActivity : Activity() {
             StopConfirm.Result.NEXT -> confirmStop()
             StopConfirm.Result.STOP -> { LockService.setRunning(this, false); refresh() }
             StopConfirm.Result.TOO_LATE -> {
-                AlertDialog.Builder(this).setMessage("1時を過ぎたので停止できません。").setPositiveButton("OK", null)
+                AlertDialog.Builder(this).setMessage("0時を過ぎたので停止できません。").setPositiveButton("OK", null)
                     .show().also { dialog = it }
                 refresh()
             }
@@ -227,7 +227,7 @@ class MainActivity : Activity() {
         val outing = state.outing(night)
         goOutButton.isEnabled = !outing && Schedule.canGoOut(now)
         comeHomeButton.isEnabled = outing
-        // 1時〜6時に変えると、その場でロックを抜けられてしまうので変えさせない
+        // 0時〜6時に変えると、その場でロックを抜けられてしまうので変えさせない
         appButtons.forEach { it.isEnabled = !Schedule.isLate(now) }
         stopButton.isEnabled = state.enabled && Schedule.canStop(now)
         fun mark(b: Boolean) = if (b) "✓" else "—"

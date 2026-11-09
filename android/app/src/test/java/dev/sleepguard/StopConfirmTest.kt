@@ -6,12 +6,12 @@ import java.time.LocalDateTime
 
 class StopConfirmTest {
 
-    private fun at(time: String) = LocalDateTime.parse("2026-10-25T$time")
+    private fun at(time: String) = LocalDateTime.parse(if ("T" in time) time else "2026-10-25T$time")
 
     @Test
-    fun `1時から6時までは停止できない`() {
-        assertEquals(true, Schedule.canStop(at("00:59")))
-        assertEquals(false, Schedule.canStop(at("01:00")))
+    fun `0時から6時までは停止できない`() {
+        assertEquals(true, Schedule.canStop(at("23:59")))
+        assertEquals(false, Schedule.canStop(at("00:00")))
         assertEquals(false, Schedule.canStop(at("05:59")))
         assertEquals(true, Schedule.canStop(at("06:00")))
     }
@@ -48,10 +48,10 @@ class StopConfirmTest {
     }
 
     @Test
-    fun `確認の途中で1時を過ぎたら停止しない`() {
+    fun `確認の途中で0時を過ぎたら停止しない`() {
         val c = StopConfirm()
-        c.stop(at("00:59"))
-        c.stop(at("00:59"))
-        assertEquals(StopConfirm.Result.TOO_LATE, c.stop(at("01:00")))
+        c.stop(at("23:59"))
+        c.stop(at("23:59"))
+        assertEquals(StopConfirm.Result.TOO_LATE, c.stop(at("2026-10-26T00:00")))
     }
 }

@@ -38,7 +38,7 @@ class Guard(private val state: State, private val fx: Effects) {
     /** 外出中の通知をいま出しているかどうか。出していない状態で始まる。 */
     private var statusOuting = false
 
-    /** 端末の状態は、使用中かどうかが要る時間帯(22時台と1時以降)にだけ読む。 */
+    /** 端末の状態は、使用中かどうかが要る時間帯(22時以降)にだけ読む。 */
     fun tick(now: LocalDateTime, ms: Long, readDevice: () -> Device) {
         val hm = Schedule.hm(now)
         val night = Schedule.nightOf(now)
@@ -64,25 +64,19 @@ class Guard(private val state: State, private val fx: Effects) {
                     state.bathShownNight = night.toString()
                     fx.bath()
                 }
+                if (hm >= Schedule.WARN && !outing && state.once("warn", night))
+                    fx.post("まもなく0時です", "0時以降も使っていると、10分後に画面をロックします。")
             }
             hm >= Schedule.LATE_END -> { /* 日中は何もしない */ }
-            hm < Schedule.WARN -> {
-                if (state.once("midnight", night))
-                    fx.post("0時です", "寝る準備をしましょう。")
-            }
-            hm < Schedule.LATE_START -> {
-                if (!outing && state.once("warn", night))
-                    fx.post("まもなく1時です", "1時以降も使っていると、10分後に画面をロックします。")
-            }
             outing -> if (inUse && state.once("outingLate", night)) {
-                fx.post("外出中でも2時までには寝ましょう", "")
+                fx.post("外出中でも1時までには寝ましょう", "")
             }
-            hm < Schedule.LATE_HOME_START && state.lateHome(night) -> { /* 1時以降に帰宅したら2時までは何もしない */ }
+            hm < Schedule.LATE_HOME_START && state.lateHome(night) -> { /* 0時以降に帰宅したら1時までは何もしない */ }
             else -> if (inUse) {
                 if (state.lateNight() != night.toString()) {
                     state.startLate(night, ms)
                     fx.post(
-                        if (state.lateHome(night)) "2時を過ぎました" else "1時を過ぎました",
+                        if (state.lateHome(night)) "1時を過ぎました" else "0時を過ぎました",
                         "10分後もまだ使っていたら画面をロックします。",
                     )
                 } else if (ms - state.lateSince() >= Schedule.LOCK_GRACE_MS) {
@@ -149,10 +143,9 @@ class Guard(private val state: State, private val fx: Effects) {
         if (!state.outing(night)) return
         state.clearOuting()
         showStatus(false)
-        val hm = Schedule.hm(now)
-        if (hm >= Schedule.LATE_START && hm < Schedule.LATE_END) {
+        if (Schedule.isLate(now)) {
             state.setLateHome(night)
-            fx.post("おかえりなさい", "2時以降も使っていたら、10分後に画面をロックします。")
+            fx.post("おかえりなさい", "1時以降も使っていたら、10分後に画面をロックします。")
         }
     }
 
